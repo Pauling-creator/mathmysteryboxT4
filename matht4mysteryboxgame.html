@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎁 MYSTERY BOX - The Ultimate Learning Challenge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Poppins', 'sans-serif'],
+                    },
+                    colors: {
+                        magical: {
+                            900: '#1a0b2e',
+                            800: '#2d1b4e',
+                            700: '#432c7a',
+                            gold: '#ffd700',
+                            accent: '#ff007f'
+                        }
+                    },
+                    animation: {
+                        'wiggle': 'wiggle 1s ease-in-out infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        wiggle: {
+                            '0%, 100%': { transform: 'rotate(-3deg)' },
+                            '50%': { transform: 'rotate(3deg)' },
+                        },
+                        glow: {
+                            'from': { boxShadow: '0 0 10px #fff, 0 0 20px #fff, 0 0 30px #ffd700' },
+                            'to': { boxShadow: '0 0 20px #fff, 0 0 30px #ff4da6, 0 0 40px #ff4da6' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f0518 0%, #2a114b 100%);
+            color: white;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .box-card {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            transform-style: preserve-3d;
+            cursor: pointer;
+            background: linear-gradient(to bottom right, #5c258d, #4389a2);
+            border: 2px solid #ffd700;
+        }
+        
+        .box-card:hover:not(.solved) {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 10px 20px rgba(255, 215, 0, 0.5);
+        }
+
+        .box-card.solved {
+            background: linear-gradient(to bottom right, #11998e, #38ef7d);
+            border-color: #fff;
+            cursor: default;
+            opacity: 0.8;
+        }
+        
+        .box-card.solved:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        .box-card.failed {
+            background: linear-gradient(to bottom right, #4b5563, #1f2937);
+            border-color: #6b7280;
+            cursor: default;
+            opacity: 0.7;
+        }
+        
+        .box-card.failed:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1a0b2e;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ffd700;
+            border-radius: 4px;
+        }
+        
+        .urgent-timer {
+            animation: pulse-fast 1s infinite;
+            color: #ef4444 !important;
+            text-shadow: 0 0 10px #ef4444;
+        }
+
+        .shake-error {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .badge-easy { background: #22c55e; color: white; }
+        .badge-medium { background: #eab308; color: black; }
+        .badge-challenge { background: #ef4444; color: white; }
+    </style>
+</head>
+<body class="font-sans antialiased">
+    <!-- Audio Elements -->
+    <audio id="sfx-open" src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3" preload="auto"></audio>
+    <audio id="sfx-correct" src="https://assets.mixkit.co/active_storage/sfx/2003/2003-preview.mp3" preload="auto"></audio>
+    <audio id="sfx-wrong" src="https://assets.mixkit.co/active_storage/sfx/2004/2004-preview.mp3" preload="auto"></audio>
+    <audio id="sfx-victory" src="https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3" preload="auto"></audio>
+
+    <div class="fixed top-4 right-4 z-50 flex gap-2">
+        <button id="btn-sound" class="glass-panel p-2 rounded-full w-10 h-10 flex items-center justify-center hover:bg-white/20 transition">
+            <i class="fas fa-volume-up text-white" id="icon-sound"></i>
+        </button>
+        <button id="btn-settings-toggle" class="glass-panel p-2 rounded-full w-10 h-10 flex items-center justify-center hover:bg-white/20 transition" title="Teacher Settings">
+            <i class="fas fa-cog text-white"></i>
+        </button>
+    </div>
+
+    <!-- App Container -->
+    <div id="app" class="container mx-auto px-4 py-8 max-w-6xl relative min-h-screen flex flex-col">
+        
+        <!-- Screen 1: Start Screen -->
+        <div id="screen-start" class="flex-grow flex flex-col items-center justify-center text-center">
+            <h1 class="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-2 drop-shadow-lg">
+                🎁 MYSTERY BOX
+            </h1>
+            <h2 class="text-2xl md:text-3xl font-bold text-white mb-1">The Ultimate Learning Challenge</h2>
+            <p class="text-lg md:text-xl text-gray-300 mb-8 max-w-2xl">
+                Choose a box. Reveal the mystery. Solve the question. Become the champion!<br>
+                <span class="italic text-sm text-gray-400">Pilih kotak. Bongkar misteri. Jawab soalan. Jadilah juara!</span>
+            </p>
+
+            <div class="glass-panel rounded-2xl p-6 md:p-8 w-full max-w-3xl mb-8 relative overflow-hidden">
+                <div class="absolute -top-10 -right-10 text-yellow-500 opacity-20 text-9xl">
+                    <i class="fas fa-treasure-chest"></i>
+                </div>
+                
+                <div class="grid md:grid-cols-2 gap-8 text-left relative z-10">
+                    <!-- EN Instructions -->
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2 text-blue-300">
+                            🇬🇧 GAME INSTRUCTIONS
+                        </h3>
+                        <ul class="text-sm space-y-2 text-gray-200">
+                            <li>1. Choose any mystery box (1-30).</li>
+                            <li>2. Answer the hidden question.</li>
+                            <li>3. <strong class="text-green-400">CORRECT:</strong> Box stays open 🎉.</li>
+                            <li>4. <strong class="text-red-400">WRONG:</strong> Box closes again.</li>
+                            <li>5. Try to solve as many in 30 minutes!</li>
+                        </ul>
+                    </div>
+                    <!-- MY Instructions -->
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2 text-blue-300">
+                            🇲🇾 ARAHAN PERMAINAN
+                        </h3>
+                        <ul class="text-sm space-y-2 text-gray-200">
+                            <li>1. Pilih mana-mana kotak misteri (1-30).</li>
+                            <li>2. Jawab soalan tersembunyi.</li>
+                            <li>3. <strong class="text-green-400">BETUL:</strong> Kotak kekal terbuka 🎉.</li>
+                            <li>4. <strong class="text-red-400">SALAH:</strong> Kotak tertutup semula.</li>
+                            <li>5. Selesaikan sebanyak mungkin dalam 30 minit!</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="mt-8 border-t border-white/20 pt-6">
+                    <label class="block text-sm font-bold mb-2 text-left" for="student-name">Enter Your Name / Masukkan Nama:</label>
+                    <input type="text" id="student-name" class="w-full px-4 py-3 rounded-lg bg-black/50 border border-white/30 text-white focus:outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 mb-4" placeholder="Your Name here...">
+                    
+                    <button id="btn-start-game" class="w-full py-4 rounded-xl font-bold text-xl bg-gradient-to-r from-green-400 to-blue-500 hover:from-green-500 hover:to-blue-600 shadow-[0_0_15px_rgba(74,222,128,0.5)] transition transform hover:scale-[1.02] active:scale-95 text-white">
+                        ▶️ START GAME
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Screen 2: Game Board -->
+        <div id="screen-game" class="hidden flex-col w-full h-full flex-grow">
+            <!-- Scoreboard -->
+            <div class="glass-panel rounded-xl p-4 mb-6 sticky top-4 z-40 flex flex-wrap justify-between items-center gap-4">
+                <div class="flex items-center gap-2 bg-black/40 px-4 py-2 rounded-lg font-mono text-xl md:text-2xl font-bold">
+                    ⏱️ <span id="ui-timer" class="tracking-wider">30:00</span>
+                </div>
+                <div class="flex flex-wrap gap-4 md:gap-8 font-bold text-sm md:text-lg">
+                    <div class="flex items-center gap-2">
+                        🎯 SOLVED: <span id="ui-solved" class="text-green-400">0 / 30</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        ⭐ SCORE: <span id="ui-score" class="text-yellow-400">0</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        🔥 STREAK: <span id="ui-streak" class="text-orange-400">0</span>
+                    </div>
+                </div>
+                <button id="btn-end-early" class="text-xs bg-red-500/20 hover:bg-red-500/40 text-red-300 px-3 py-1 rounded">End Game</button>
+            </div>
+
+            <!-- Motivational Message -->
+            <div id="motivational-msg" class="text-center font-bold text-yellow-300 h-8 mb-4 transition-opacity duration-500 opacity-0 text-lg">
+                You can do this!
+            </div>
+
+            <!-- Grid -->
+            <div class="grid grid-cols-5 gap-3 md:gap-4 lg:gap-6 w-full max-w-4xl mx-auto flex-grow items-center mb-8" id="grid-container">
+                <!-- Boxes generated by JS -->
+            </div>
+        </div>
+
+        <!-- Screen 3: Final Results -->
+        <div id="screen-result" class="hidden flex-grow flex-col items-center justify-center">
+            <div id="result-card" class="glass-panel rounded-3xl p-8 md:p-12 w-full max-w-2xl relative overflow-hidden bg-gradient-to-br from-[#1a0b2e] to-[#2d1b4e]">
+                
+                <div class="text-center mb-8 relative z-10">
+                    <h2 class="text-4xl md:text-5xl font-black text-yellow-400 mb-2 drop-shadow-md">🏆 MYSTERY BOX COMPLETED!</h2>
+                    <p id="result-message" class="text-xl md:text-2xl font-bold text-green-400">🌟 Excellent Performance!</p>
+                </div>
+
+                <div class="bg-black/40 rounded-xl p-6 relative z-10 border border-white/10">
+                    <div class="grid grid-cols-2 gap-y-4 gap-x-2 text-sm md:text-base">
+                        <div class="text-gray-400">Student Name:</div>
+                        <div class="font-bold text-white text-right truncate" id="res-name">-</div>
+                        
+                        <div class="text-gray-400">Subject:</div>
+                        <div class="font-bold text-white text-right" id="res-subject">-</div>
+                        
+                        <div class="text-gray-400">Form:</div>
+                        <div class="font-bold text-white text-right" id="res-form">-</div>
+                        
+                        <div class="text-gray-400">Topics:</div>
+                        <div class="font-bold text-white text-right truncate" id="res-topics">-</div>
+                        
+                        <div class="col-span-2 border-t border-white/10 my-2"></div>
+                        
+                        <div class="text-gray-400">Questions Solved:</div>
+                        <div class="font-bold text-green-400 text-right text-lg" id="res-solved">-</div>
+                        
+                        <div class="text-gray-400">Total Score:</div>
+                        <div class="font-bold text-yellow-400 text-right text-lg" id="res-score">-</div>
+                        
+                        <div class="text-gray-400">Accuracy:</div>
+                        <div class="font-bold text-white text-right" id="res-accuracy">-</div>
+                        
+                        <div class="text-gray-400">Highest Streak:</div>
+                        <div class="font-bold text-orange-400 text-right" id="res-streak">-</div>
+                        
+                        <div class="text-gray-400">Time Used:</div>
+                        <div class="font-bold text-white text-right" id="res-time">-</div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-center gap-2 flex-wrap" id="res-achievements">
+                    <!-- Achievements injected here -->
+                </div>
+
+                <div class="absolute bottom-4 right-4 opacity-30 text-xs font-mono">
+                    Date: <span id="res-date"></span>
+                </div>
+            </div>
+
+            <div class="mt-8 flex flex-col items-center gap-4">
+                <p class="text-sm text-gray-300">📱 Screenshot this result and send it to your teacher.</p>
+                <button id="btn-screenshot-mock" class="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl font-bold text-lg hover:shadow-[0_0_20px_rgba(168,85,247,0.5)] transition flex items-center gap-2">
+                    <i class="fas fa-camera"></i> Prepare Result Card
+                </button>
+                <button id="btn-reset" class="text-sm text-gray-400 hover:text-white underline mt-4">Play Again (Reset Game)</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Question Modal -->
+    <div id="modal-question" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay hidden px-4">
+        <div class="glass-panel rounded-2xl w-full max-w-2xl bg-[#1a0b2e] border-2 border-purple-500/50 shadow-2xl transform scale-95 opacity-0 transition-all duration-300" id="modal-content">
+            
+            <div class="p-6 md:p-8 flex flex-col">
+                <div class="flex justify-between items-center border-b border-white/10 pb-4 mb-6">
+                    <h3 class="text-2xl font-black text-yellow-400 flex items-center gap-2">
+                        🎁 MYSTERY BOX #<span id="q-box-num"></span>
+                    </h3>
+                    <span id="q-difficulty" class="badge"></span>
+                </div>
+
+                <div class="min-h-[150px] flex items-center justify-center mb-8">
+                    <p id="q-text" class="text-xl md:text-2xl text-center font-medium leading-relaxed"></p>
+                </div>
+
+                <div id="q-input-area" class="w-full max-w-md mx-auto mb-6">
+                    <!-- Dynamic input based on type -->
+                </div>
+
+                <div class="flex gap-4 mt-auto">
+                    <button id="btn-cancel-q" class="flex-1 py-3 rounded-xl font-bold bg-white/10 hover:bg-white/20 transition">
+                        CLOSE
+                    </button>
+                    <button id="btn-submit-q" class="flex-1 py-3 rounded-xl font-bold bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 shadow-lg transition">
+                        SUBMIT ANSWER
+                    </button>
+                </div>
+                
+                <!-- Feedback Overlay inside modal -->
+                <div id="q-feedback" class="absolute inset-0 bg-black/90 rounded-2xl hidden flex-col items-center justify-center z-10">
+                    <div id="feedback-icon" class="text-6xl mb-4"></div>
+                    <h2 id="feedback-title" class="text-3xl font-bold mb-2"></h2>
+                    <p id="feedback-msg" class="text-lg text-gray-300"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Teacher Settings Modal -->
+    <div id="modal-settings" class="fixed inset-0 z-50 flex items-center justify-center modal-overlay hidden p-4">
+        <div class="bg-gray-900 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-gray-700 shadow-2xl">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-800 rounded-t-xl">
+                <h3 class="text-xl font-bold flex items-center gap-2"><i class="fas fa-cogs"></i> Author Settings</h3>
+                <button id="btn-close-settings" class="text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto flex-grow custom-scrollbar">
+                <h4 class="font-bold text-yellow-400 mb-4 border-b border-gray-700 pb-2">Game Info</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">Subject</label>
+                        <input type="text" id="set-subject" class="w-full bg-black/50 border border-gray-600 rounded p-2 text-white" value="Matematik KSSM">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">Form</label>
+                        <input type="text" id="set-form" class="w-full bg-black/50 border border-gray-600 rounded p-2 text-white" value="4">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">Teacher Name</label>
+                        <input type="text" id="set-teacher" class="w-full bg-black/50 border border-gray-600 rounded p-2 text-white" value="Chia Pau Ling">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">Topics</label>
+                        <input type="text" id="set-topics" class="w-full bg-black/50 border border-gray-600 rounded p-2 text-white" value="Persamaan Kuadratik, Asas Nombor">
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-end mb-4 border-b border-gray-700 pb-2">
+                    <h4 class="font-bold text-yellow-400">Questions (30 Required)</h4>
+                    <span class="text-xs text-gray-400">Changes apply on next start</span>
+                </div>
+                
+                <div id="settings-questions-list" class="space-y-4">
+                    <!-- Editor rows injected here -->
+                </div>
+            </div>
+            
+            <div class="p-4 border-t border-gray-700 bg-gray-800 rounded-b-xl flex justify-end gap-4">
+                <button id="btn-save-settings" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- State Management ---
+        const GameState = {
+            studentName: "",
+            settings: {
+                subject: "Mathematics KSSM",
+                form: "4",
+                teacher: "Chia Pau Ling",
+                topics: "Quadratic Functions, Number Bases, Logical Reasoning, Sets, Network in Graph Theory"
+            },
+            questions: [], // 30 objects
+            boxes: [],     // Maps box index to question and state
+            timerDuration: 30 * 60, // 30 mins in seconds
+            timeRemaining: 30 * 60,
+            timerInterval: null,
+            score: 0,
+            solved: 0,
+            failed: 0,
+            streak: 0,
+            highestStreak: 0,
+            totalAttempts: 0,
+            isPlaying: false,
+            soundEnabled: true,
+            currentActiveBoxIndex: null, // Box currently being attempted
+            
+            messages: [
+                "💡 Think carefully!", "🧠 Use your mathematical thinking!", 
+                "🔥 You can do this!", "⭐ Great choice!", "🚀 Keep going!", 
+                "🎯 Focus on the question requirement!", "💪 Don't give up!", 
+                "🏆 Can you become the Mystery Box Champion?"
+            ]
+        };
+
+        // --- Default Questions Data (30 items) ---
+        const defaultQuestions = [
+            // Topic 1: Fungsi dan Persamaan Kuadratik
+            { id: 1, difficulty: "Easy", type: "short", text: "Apakah kuasa tertinggi bagi pemboleh ubah dalam ungkapan kuadratik?<br><br>What is the highest power of the variable in a quadratic expression?", answer: "2", options: null, points: 10 },
+            { id: 2, difficulty: "Medium", type: "mcq", text: "Faktorkan x² + 5x + 6.<br><br>Factorise x² + 5x + 6.", answer: "A) (x+2)(x+3)", options: ["A) (x+2)(x+3)", "B) (x-2)(x-3)", "C) (x+1)(x+6)", "D) (x-1)(x-6)"], points: 20 },
+            { id: 3, difficulty: "Challenge", type: "short", text: "Diberi f(x) = 2x² - 5x + c melalui titik (1, 0), cari nilai c.<br><br>Given f(x) = 2x² - 5x + c passes through point (1, 0), find the value of c.", answer: "3", options: null, points: 30 },
+            { id: 4, difficulty: "Easy", type: "tf", text: "Graf y = -x² + 2x + 1 mempunyai bentuk minimum (bentuk U).<br><br>The graph of y = -x² + 2x + 1 has a minimum shape (U-shape).", answer: "Palsu / False", options: ["Benar / True", "Palsu / False"], points: 10 },
+            { id: 5, difficulty: "Medium", type: "mcq", text: "Cari nilai positif x bagi x² - 16 = 0.<br><br>Find the positive value of x for x² - 16 = 0.", answer: "B) 4", options: ["A) 2", "B) 4", "C) 8", "D) 16"], points: 20 },
+            { id: 6, difficulty: "Challenge", type: "mcq", text: "Luas sebuah segi empat tepat ialah x² + 3x - 10 dan panjangnya ialah x+5. Apakah lebarnya?<br><br>The area of a rectangle is x² + 3x - 10 and its length is x+5. What is its width?", answer: "C) x-2", options: ["A) x-5", "B) x+2", "C) x-2", "D) x+5"], points: 30 },
+            
+            // Topic 2: Asas Nombor
+            { id: 7, difficulty: "Easy", type: "short", text: "Nyatakan 101₂ dalam asas 10.<br><br>State 101₂ in base 10.", answer: "5", options: null, points: 10 },
+            { id: 8, difficulty: "Medium", type: "mcq", text: "Tukarkan 25₁₀ kepada asas 4.<br><br>Convert 25₁₀ to base 4.", answer: "A) 121₄", options: ["A) 121₄", "B) 211₄", "C) 112₄", "D) 221₄"], points: 20 },
+            { id: 9, difficulty: "Challenge", type: "short", text: "Hitung 110₂ + 11₂ dalam asas 2. (Masukkan nombor sahaja)<br><br>Calculate 110₂ + 11₂ in base 2. (Enter numbers only)", answer: "1001", options: null, points: 30 },
+            { id: 10, difficulty: "Easy", type: "mcq", text: "Antara digit berikut, yang manakah TIDAK boleh wujud dalam asas 5?<br><br>Which of the following digits CANNOT exist in base 5?", answer: "D) 5", options: ["A) 0", "B) 3", "C) 4", "D) 5"], points: 10 },
+            { id: 11, difficulty: "Medium", type: "short", text: "Ungkapkan 3 × 5³ + 2 × 5¹ sebagai nombor dalam asas 5.<br><br>Express 3 × 5³ + 2 × 5¹ as a number in base 5.", answer: "3020", options: null, points: 20 },
+            { id: 12, difficulty: "Challenge", type: "mcq", text: "Jika x₈ = 10111₂, apakah nilai x?<br><br>If x₈ = 10111₂, what is the value of x?", answer: "C) 27", options: ["A) 17", "B) 23", "C) 27", "D) 37"], points: 30 },
+            
+            // Topic 3: Penaakulan Logik
+            { id: 13, difficulty: "Easy", type: "tf", text: "Suatu pernyataan mestilah sama ada benar atau palsu, tetapi bukan kedua-duanya.<br><br>A statement must be either true or false, but not both at the same time.", answer: "Benar / True", options: ["Benar / True", "Palsu / False"], points: 10 },
+            { id: 14, difficulty: "Medium", type: "mcq", text: "Bentuk satu pernyataan majmuk yang benar: 5 ialah nombor ganjil ___ 3 ialah nombor genap.<br><br>Form a true compound statement: 5 is an odd number ___ 3 is an even number.", answer: "B) atau / or", options: ["A) dan / and", "B) atau / or"], points: 20 },
+            { id: 15, difficulty: "Challenge", type: "mcq", text: "Apakah kontrapositif bagi 'Jika x = 2, maka x² = 4'?<br><br>What is the contrapositive of 'If x = 2, then x² = 4'?", answer: "C) Jika x² ≠ 4, maka x ≠ 2 / If x² ≠ 4, then x ≠ 2", options: ["A) Jika x ≠ 2, maka x² ≠ 4 / If x ≠ 2, then x² ≠ 4", "B) Jika x² = 4, maka x = 2 / If x² = 4, then x = 2", "C) Jika x² ≠ 4, maka x ≠ 2 / If x² ≠ 4, then x ≠ 2"], points: 30 },
+            { id: 16, difficulty: "Easy", type: "tf", text: "'x + 2 = 5' ialah satu pernyataan.<br><br>'x + 2 = 5' is a statement.", answer: "Palsu / False", options: ["Benar / True", "Palsu / False"], points: 10 },
+            { id: 17, difficulty: "Medium", type: "mcq", text: "Premis 1: Semua gandaan 4 ialah gandaan 2.<br>Premis 2: 12 ialah gandaan 4.<br>Kesimpulan: ?<br><br>Premise 1: All multiples of 4 are multiples of 2.<br>Premise 2: 12 is a multiple of 4.<br>Conclusion: ?", answer: "B) 12 ialah gandaan 2 / 12 is a multiple of 2", options: ["A) 2 ialah gandaan 12 / 2 is a multiple of 12", "B) 12 ialah gandaan 2 / 12 is a multiple of 2", "C) 4 ialah gandaan 12 / 4 is a multiple of 12"], points: 20 },
+            { id: 18, difficulty: "Challenge", type: "mcq", text: "Premis 1: Semua poligon ada 3 sisi.<br>Premis 2: Segi empat sama ialah poligon.<br>Kesimpulan: Segi empat sama ada 3 sisi.<br>Tentukan kesahan dan kemunasabahan.<br><br>Determine validity and soundness.", answer: "B) Sah tetapi Tidak Munasabah / Valid but Not Sound", options: ["A) Sah dan Munasabah / Valid and Sound", "B) Sah tetapi Tidak Munasabah / Valid but Not Sound", "C) Tidak Sah / Not Valid", "D) Munasabah tetapi Tidak Sah / Sound but Not Valid"], points: 30 },
+            
+            // Topic 4: Operasi Set
+            { id: 19, difficulty: "Easy", type: "tf", text: "Simbol ∪ mewakili persilangan set.<br><br>The symbol ∪ represents the intersection of sets.", answer: "Palsu / False", options: ["Benar / True", "Palsu / False"], points: 10 },
+            { id: 20, difficulty: "Medium", type: "short", text: "Jika A = {1,2,3} dan B = {3,4,5}, apakah elemen tunggal dalam A ∩ B?<br><br>If A = {1,2,3} and B = {3,4,5}, what is the single element in A ∩ B?", answer: "3", options: null, points: 20 },
+            { id: 21, difficulty: "Challenge", type: "short", text: "Diberi set Semesta ξ = {1,2,3,4,5}, P={1,2}, Q={2,3,4}. Cari elemen tunggal dalam (P ∪ Q)'.<br><br>Given Universal set ξ = {1,2,3,4,5}, P={1,2}, Q={2,3,4}. Find the single element in (P ∪ Q)'.", answer: "5", options: null, points: 30 },
+            { id: 22, difficulty: "Easy", type: "mcq", text: "Apakah maksud simbol ⊂ ?<br><br>What does the symbol ⊂ mean?", answer: "B) Subset bagi / Subset of", options: ["A) Unsur bagi / Element of", "B) Subset bagi / Subset of", "C) Kesatuan bagi / Union of", "D) Set Semesta / Universal Set"], points: 10 },
+            { id: 23, difficulty: "Medium", type: "short", text: "Jika set M mempunyai 3 unsur, berapakah bilangan subset yang mungkin bagi M?<br><br>If set M has 3 elements, how many possible subsets does M have?", answer: "8", options: null, points: 20 },
+            { id: 24, difficulty: "Challenge", type: "mcq", text: "Dalam kelas 30 murid, 20 suka Matematik, 15 suka Sains, dan 5 tidak suka kedua-duanya. Berapakah yang suka KEDUA-DUA subjek?<br><br>In a class of 30 students, 20 like Math, 15 like Science, and 5 like neither. How many like BOTH subjects?", answer: "B) 10", options: ["A) 5", "B) 10", "C) 15", "D) 20"], points: 30 },
+            
+            // Topic 5: Rangkaian dalam Teori Graf
+            { id: 25, difficulty: "Easy", type: "mcq", text: "Graf tanpa gelung dan berbilang tepi dipanggil graf ______.<br><br>A graph with no loops and no multiple edges is called a ______ graph.", answer: "A) Mudah / Simple", options: ["A) Mudah / Simple", "B) Terarah / Directed", "C) Pemberat / Weighted"], points: 10 },
+            { id: 26, difficulty: "Medium", type: "short", text: "Jika satu graf mempunyai 5 tepi, apakah jumlah darjah bagi semua bucunya?<br><br>If a graph has 5 edges, what is the sum of degrees of all its vertices?", answer: "10", options: null, points: 20 },
+            { id: 27, difficulty: "Challenge", type: "mcq", text: "Satu pokok (tree) mempunyai n bucu. Berapakah bilangan tepinya?<br><br>A tree has n vertices. How many edges does it have?", answer: "B) n-1", options: ["A) n", "B) n-1", "C) n+1", "D) 2n"], points: 30 },
+            { id: 28, difficulty: "Easy", type: "tf", text: "Dalam graf terarah, darjah bucu dibahagikan kepada darjah masuk dan darjah keluar.<br><br>In a directed graph, the degree of a vertex is divided into in-degree and out-degree.", answer: "Benar / True", options: ["Benar / True", "Palsu / False"], points: 10 },
+            { id: 29, difficulty: "Medium", type: "short", text: "Satu graf mempunyai bucu dengan darjah 2, 3, 3, 4. Berapakah bilangan tepi graf ini?<br><br>A graph has vertices with degrees 2, 3, 3, 4. How many edges does this graph have?", answer: "6", options: null, points: 20 },
+            { id: 30, difficulty: "Challenge", type: "mcq", text: "Apakah definisi yang betul bagi subgraf?<br><br>What is the correct definition of a subgraph?", answer: "B) Sebahagian atau keseluruhan graf itu / A part of or the whole graph itself", options: ["A) Graf yang mengandungi semua tepi asal / A graph containing all original edges", "B) Sebahagian atau keseluruhan graf itu / A part of or the whole graph itself", "C) Graf berserta pemberat / A graph with weights"], points: 30 }
+        ];
+        
+        GameState.questions = [...defaultQuestions];
+
+        // --- STREAMING_CHUNK:DOM Elements & Audio Control... ---
+        const DOM = {
+            screens: {
+                start: document.getElementById('screen-start'),
+                game: document.getElementById('screen-game'),
+                result: document.getElementById('screen-result')
+            },
+            ui: {
+                timer: document.getElementById('ui-timer'),
+                solved: document.getElementById('ui-solved'),
+                score: document.getElementById('ui-score'),
+                streak: document.getElementById('ui-streak')
+            },
+            grid: document.getElementById('grid-container'),
+            msg: document.getElementById('motivational-msg'),
+            modal: {
+                wrap: document.getElementById('modal-question'),
+                content: document.getElementById('modal-content'),
+                num: document.getElementById('q-box-num'),
+                diff: document.getElementById('q-difficulty'),
+                text: document.getElementById('q-text'),
+                inputArea: document.getElementById('q-input-area'),
+                feedback: document.getElementById('q-feedback'),
+                fIcon: document.getElementById('feedback-icon'),
+                fTitle: document.getElementById('feedback-title'),
+                fMsg: document.getElementById('feedback-msg')
+            },
+            audio: {
+                open: document.getElementById('sfx-open'),
+                correct: document.getElementById('sfx-correct'),
+                wrong: document.getElementById('sfx-wrong'),
+                victory: document.getElementById('sfx-victory')
+            }
+        };
+
+        function playSound(type) {
+            if (!GameState.soundEnabled) return;
+            try {
+                if(DOM.audio[type]) {
+                    DOM.audio[type].currentTime = 0;
+                    DOM.audio[type].play().catch(e=>console.log("Audio play prevented"));
+                }
+            } catch(e) {}
+        }
+
+        document.getElementById('btn-sound').addEventListener('click', () => {
+            GameState.soundEnabled = !GameState.soundEnabled;
+            const icon = document.getElementById('icon-sound');
+            icon.className = GameState.soundEnabled ? 'fas fa-volume-up text-white' : 'fas fa-volume-mute text-gray-500';
+        });
+
+        // --- STREAMING_CHUNK:Initialization and UI Building... ---
+        function initApp() {
+            populateSettingsEditor();
+            
+            document.getElementById('btn-start-game').addEventListener('click', startGame);
+            document.getElementById('btn-end-early').addEventListener('click', endGame);
+            document.getElementById('btn-reset').addEventListener('click', resetApp);
+            
+            // Modal controls
+            document.getElementById('btn-cancel-q').addEventListener('click', closeQuestionModal);
+            document.getElementById('btn-submit-q').addEventListener('click', handleAnswerSubmit);
+            
+            // Settings controls
+            document.getElementById('btn-settings-toggle').addEventListener('click', () => {
+                document.getElementById('modal-settings').classList.remove('hidden');
+            });
+            document.getElementById('btn-close-settings').addEventListener('click', () => {
+                document.getElementById('modal-settings').classList.add('hidden');
+            });
+            document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
+            
+            // Screenshot prep
+            document.getElementById('btn-screenshot-mock').addEventListener('click', () => {
+                document.getElementById('result-card').style.border = "4px solid #ffd700";
+                alert("Result card ready! Please use your device's screenshot function to capture the card above.");
+            });
+        }
+
+        // --- STREAMING_CHUNK:Game Flow Functions... ---
+        function startGame() {
+            const nameInput = document.getElementById('student-name').value.trim();
+            if(!nameInput) {
+                alert("Please enter your name to start.");
+                return;
+            }
+            GameState.studentName = nameInput;
+            GameState.isPlaying = true;
+            GameState.timeRemaining = GameState.timerDuration;
+            GameState.score = 0;
+            GameState.solved = 0;
+            GameState.failed = 0;
+            GameState.streak = 0;
+            GameState.highestStreak = 0;
+            GameState.totalAttempts = 0;
+            
+            setupBoxes();
+            updateUI();
+            
+            DOM.screens.start.classList.add('hidden');
+            DOM.screens.game.classList.remove('hidden');
+            DOM.screens.game.classList.add('flex');
+            
+            startTimer();
+            showRandomMessage();
+        }
+
+        function setupBoxes() {
+            DOM.grid.innerHTML = '';
+            GameState.boxes = [];
+            
+            // Shuffle questions
+            let shuffledQ = [...GameState.questions].sort(() => Math.random() - 0.5);
+            
+            for(let i=0; i<30; i++) {
+                GameState.boxes.push({
+                    id: i+1,
+                    question: shuffledQ[i],
+                    solved: false,
+                    failed: false
+                });
+                
+                // Create DOM element
+                const boxEl = document.createElement('div');
+                boxEl.className = 'box-card aspect-square rounded-xl flex flex-col items-center justify-center text-white relative shadow-lg';
+                boxEl.innerHTML = `
+                    <div class="text-3xl md:text-5xl mb-2 filter drop-shadow-md">🎁</div>
+                    <div class="font-black text-xl md:text-2xl">${i+1}</div>
+                `;
+                boxEl.dataset.index = i;
+                boxEl.addEventListener('click', () => openBox(i));
+                DOM.grid.appendChild(boxEl);
+            }
+        }
+
+        function updateUI() {
+            DOM.ui.solved.textContent = `${GameState.solved} / 30`;
+            DOM.ui.score.textContent = GameState.score;
+            DOM.ui.streak.textContent = GameState.streak;
+            
+            if(GameState.streak >= 2) DOM.ui.streak.parentElement.classList.add('animate-pulse-fast');
+            else DOM.ui.streak.parentElement.classList.remove('animate-pulse-fast');
+        }
+
+        // --- STREAMING_CHUNK:Timer Logic... ---
+        function startTimer() {
+            updateTimerDisplay();
+            GameState.timerInterval = setInterval(() => {
+                GameState.timeRemaining--;
+                updateTimerDisplay();
+                
+                if(GameState.timeRemaining <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            let m = Math.floor(GameState.timeRemaining / 60);
+            let s = GameState.timeRemaining % 60;
+            DOM.ui.timer.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            
+            // Warnings
+            if(GameState.timeRemaining <= 60) {
+                DOM.ui.timer.classList.add('urgent-timer');
+                DOM.ui.timer.parentElement.classList.replace('bg-black/40', 'bg-red-900/80');
+            } else if (GameState.timeRemaining <= 300) { // 5 mins
+                DOM.ui.timer.classList.add('text-red-400');
+                DOM.ui.timer.parentElement.classList.replace('bg-black/40', 'bg-red-900/40');
+            } else if (GameState.timeRemaining <= 600) { // 10 mins
+                DOM.ui.timer.classList.add('text-yellow-400');
+            }
+        }
+
+        function showRandomMessage() {
+            if(!GameState.isPlaying) return;
+            DOM.msg.textContent = GameState.messages[Math.floor(Math.random() * GameState.messages.length)];
+            DOM.msg.classList.remove('opacity-0');
+            setTimeout(() => {
+                if(GameState.isPlaying) DOM.msg.classList.add('opacity-0');
+            }, 3000);
+            
+            setTimeout(showRandomMessage, 15000 + Math.random()*15000);
+        }
+
+        // --- STREAMING_CHUNK:Box Interaction Logic... ---
+        function openBox(index) {
+            const boxData = GameState.boxes[index];
+            if(boxData.solved || boxData.failed || !GameState.isPlaying) return;
+            
+            playSound('open');
+            GameState.currentActiveBoxIndex = index;
+            const q = boxData.question;
+            
+            DOM.modal.num.textContent = boxData.id;
+            DOM.modal.text.innerHTML = q.text; // Changed to innerHTML to render <br> tags properly
+            
+            // Badge style
+            DOM.modal.diff.textContent = q.difficulty;
+            DOM.modal.diff.className = 'badge';
+            if(q.difficulty.toLowerCase() === 'easy') DOM.modal.diff.classList.add('badge-easy');
+            else if(q.difficulty.toLowerCase() === 'medium') DOM.modal.diff.classList.add('badge-medium');
+            else DOM.modal.diff.classList.add('badge-challenge');
+            
+            // Build Input area
+            DOM.modal.inputArea.innerHTML = '';
+            if(q.type === 'mcq' || q.type === 'tf') {
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-1 gap-3';
+                q.options.forEach((opt) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'w-full text-left px-4 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg transition q-option-btn';
+                    btn.textContent = opt;
+                    btn.onclick = () => {
+                        document.querySelectorAll('.q-option-btn').forEach(b => b.classList.remove('bg-yellow-500/50', 'border-yellow-400'));
+                        btn.classList.add('bg-yellow-500/50', 'border-yellow-400');
+                        btn.dataset.selected = "true";
+                    };
+                    grid.appendChild(btn);
+                });
+                DOM.modal.inputArea.appendChild(grid);
+            } else {
+                const inp = document.createElement('input');
+                inp.type = 'text';
+                inp.id = 'q-text-input';
+                inp.className = 'w-full px-4 py-4 rounded-xl bg-black/50 border-2 border-white/30 text-white text-xl text-center focus:outline-none focus:border-yellow-400';
+                inp.placeholder = 'Type your answer here...';
+                DOM.modal.inputArea.appendChild(inp);
+            }
+            
+            // Reset modal state
+            DOM.modal.feedback.classList.add('hidden');
+            DOM.modal.content.classList.remove('scale-95', 'opacity-0');
+            DOM.modal.wrap.classList.remove('hidden');
+        }
+
+        function closeQuestionModal() {
+            DOM.modal.content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                DOM.modal.wrap.classList.add('hidden');
+            }, 300);
+            GameState.currentActiveBoxIndex = null;
+        }
+
+        function handleAnswerSubmit() {
+            if(GameState.currentActiveBoxIndex === null) return;
+            const boxIndex = GameState.currentActiveBoxIndex;
+            const boxData = GameState.boxes[boxIndex];
+            const q = boxData.question;
+            
+            let userAnswer = "";
+            if(q.type === 'mcq' || q.type === 'tf') {
+                const selected = document.querySelector('.q-option-btn[data-selected="true"]');
+                if(!selected) {
+                    alert("Please select an answer.");
+                    return;
+                }
+                userAnswer = selected.textContent;
+            } else {
+                const inp = document.getElementById('q-text-input');
+                if(!inp.value.trim()) {
+                    alert("Please enter an answer.");
+                    return;
+                }
+                userAnswer = inp.value.trim();
+            }
+            
+            GameState.totalAttempts++;
+            
+            // Simple string compare (case insensitive)
+            const isCorrect = String(userAnswer).toLowerCase() === String(q.answer).toLowerCase();
+            
+            showFeedback(isCorrect, boxIndex, q.points);
+        }
+
+        // --- STREAMING_CHUNK:Feedback and Result Handling... ---
+        function showFeedback(isCorrect, boxIndex, points) {
+            DOM.modal.feedback.classList.remove('hidden');
+            DOM.modal.feedback.classList.add('flex');
+            
+            if(isCorrect) {
+                playSound('correct');
+                DOM.modal.fIcon.textContent = '🎉';
+                DOM.modal.fTitle.textContent = 'CONGRATULATIONS!';
+                DOM.modal.fTitle.className = 'text-3xl font-bold mb-2 text-green-400';
+                DOM.modal.fMsg.textContent = 'Correct Answer! Box Solved.';
+                
+                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, zIndex: 9999 });
+                
+                // Update State
+                GameState.score += points;
+                GameState.solved++;
+                GameState.streak++;
+                if(GameState.streak > GameState.highestStreak) GameState.highestStreak = GameState.streak;
+                GameState.boxes[boxIndex].solved = true;
+                
+                // Update Box UI
+                const boxEl = DOM.grid.children[boxIndex];
+                boxEl.classList.add('solved');
+                boxEl.innerHTML = `
+                    <div class="text-3xl md:text-5xl mb-1 filter drop-shadow-md">🎉</div>
+                    <div class="font-bold text-sm text-yellow-100">SOLVED</div>
+                `;
+                
+                updateUI();
+                
+                setTimeout(() => {
+                    closeQuestionModal();
+                    if(GameState.solved + GameState.failed >= 30) endGame();
+                }, 2000);
+                
+            } else {
+                playSound('wrong');
+                DOM.modal.content.classList.add('shake-error');
+                setTimeout(() => DOM.modal.content.classList.remove('shake-error'), 500);
+                
+                DOM.modal.fIcon.textContent = '❌';
+                DOM.modal.fTitle.textContent = 'NOT QUITE!';
+                DOM.modal.fTitle.className = 'text-3xl font-bold mb-2 text-red-400';
+                DOM.modal.fMsg.innerHTML = `Try another Mystery Box!<br><br><span class="text-sm text-gray-400">The correct answer is:</span><br><strong class="text-xl text-white">${GameState.boxes[boxIndex].question.answer}</strong>`;
+                
+                // Update State
+                GameState.streak = 0;
+                GameState.failed++;
+                GameState.boxes[boxIndex].failed = true;
+                
+                // Update Box UI
+                const boxEl = DOM.grid.children[boxIndex];
+                boxEl.classList.add('failed');
+                boxEl.innerHTML = `
+                    <div class="text-3xl md:text-5xl mb-1 filter drop-shadow-md grayscale opacity-70">💡</div>
+                    <div class="font-bold text-sm text-gray-300">REVEALED</div>
+                `;
+                
+                updateUI();
+                
+                setTimeout(() => {
+                    closeQuestionModal();
+                    if(GameState.solved + GameState.failed >= 30) endGame();
+                }, 4500); // Give the student time to read the correct answer before closing
+            }
+        }
+
+        function endGame() {
+            GameState.isPlaying = false;
+            clearInterval(GameState.timerInterval);
+            playSound('victory');
+            
+            DOM.screens.game.classList.remove('flex');
+            DOM.screens.game.classList.add('hidden');
+            DOM.screens.result.classList.remove('hidden');
+            DOM.screens.result.classList.add('flex');
+            
+            // Populate Results
+            document.getElementById('res-name').textContent = GameState.studentName;
+            document.getElementById('res-subject').textContent = GameState.settings.subject;
+            document.getElementById('res-form').textContent = GameState.settings.form;
+            document.getElementById('res-topics').textContent = GameState.settings.topics;
+            
+            document.getElementById('res-solved').textContent = `${GameState.solved} / 30`;
+            document.getElementById('res-score').textContent = `${GameState.score} points`;
+            
+            let acc = GameState.totalAttempts > 0 ? Math.round((GameState.solved / GameState.totalAttempts) * 100) : 0;
+            document.getElementById('res-accuracy').textContent = `${acc}%`;
+            document.getElementById('res-streak').textContent = GameState.highestStreak;
+            
+            let timeUsed = GameState.timerDuration - GameState.timeRemaining;
+            let m = Math.floor(timeUsed / 60);
+            let s = timeUsed % 60;
+            document.getElementById('res-time').textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            
+            document.getElementById('res-date').textContent = new Date().toLocaleDateString();
+            
+            // Performance Msg
+            let msg = document.getElementById('result-message');
+            if(GameState.solved === 30) msg.textContent = "🏆 MYSTERY BOX MASTER!";
+            else if(GameState.solved >= 20) msg.textContent = "🌟 Excellent Performance!";
+            else if(GameState.solved >= 10) msg.textContent = "👏 Great Job!";
+            else msg.textContent = "💪 Good Effort! Keep Improving!";
+            
+            // Achievements
+            const achContainer = document.getElementById('res-achievements');
+            achContainer.innerHTML = '';
+            if(GameState.solved > 0) addBadge(achContainer, '🏅 First Blood');
+            if(GameState.highestStreak >= 3) addBadge(achContainer, '🔥 On Fire');
+            if(GameState.solved >= 10) addBadge(achContainer, '💎 Treasure Hunter');
+            if(GameState.solved === 30) addBadge(achContainer, '🏆 Perfect Hunter');
+            
+            confetti({ particleCount: 200, spread: 100, origin: { y: 0.3 } });
+        }
+        
+        function addBadge(container, text) {
+            const span = document.createElement('span');
+            span.className = 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 px-3 py-1 rounded-full text-xs font-bold';
+            span.textContent = text;
+            container.appendChild(span);
+        }
+
+        function resetApp() {
+            DOM.screens.result.classList.remove('flex');
+            DOM.screens.result.classList.add('hidden');
+            DOM.screens.start.classList.remove('hidden');
+            document.getElementById('student-name').value = '';
+            
+            // Reset UI timer styles
+            DOM.ui.timer.classList.remove('urgent-timer', 'text-red-400', 'text-yellow-400');
+            DOM.ui.timer.parentElement.className = 'flex items-center gap-2 bg-black/40 px-4 py-2 rounded-lg font-mono text-xl md:text-2xl font-bold';
+        }
+
+        // --- STREAMING_CHUNK:Teacher Settings Logic... ---
+        function populateSettingsEditor() {
+            const list = document.getElementById('settings-questions-list');
+            list.innerHTML = '';
+            
+            GameState.questions.forEach((q, index) => {
+                const div = document.createElement('div');
+                div.className = 'bg-gray-800 p-4 rounded border border-gray-700';
+                div.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <h5 class="font-bold text-white">Box ${index + 1}</h5>
+                        <select class="set-q-diff bg-gray-900 border border-gray-600 rounded text-sm text-white p-1">
+                            <option value="Easy" ${q.difficulty==='Easy'?'selected':''}>Easy (10pts)</option>
+                            <option value="Medium" ${q.difficulty==='Medium'?'selected':''}>Medium (20pts)</option>
+                            <option value="Challenge" ${q.difficulty==='Challenge'?'selected':''}>Challenge (30pts)</option>
+                        </select>
+                    </div>
+                    <textarea class="set-q-text w-full bg-gray-900 border border-gray-600 rounded p-2 text-white text-sm mb-2" rows="2" placeholder="Question Text">${q.text}</textarea>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-xs text-gray-400 block mb-1">Type</label>
+                            <select class="set-q-type w-full bg-gray-900 border border-gray-600 rounded text-sm text-white p-1" onchange="toggleOptions(${index}, this.value)">
+                                <option value="short" ${q.type==='short'?'selected':''}>Short Answer</option>
+                                <option value="tf" ${q.type==='tf'?'selected':''}>True/False</option>
+                                <option value="mcq" ${q.type==='mcq'?'selected':''}>Multiple Choice</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 block mb-1">Correct Answer</label>
+                            <input type="text" class="set-q-ans w-full bg-gray-900 border border-gray-600 rounded p-1 text-white text-sm" value="${q.answer}">
+                        </div>
+                    </div>
+                    <div class="mt-2 ${q.type==='mcq' ? '' : 'hidden'}" id="opts-container-${index}">
+                        <label class="text-xs text-gray-400 block mb-1">MCQ Options (comma separated)</label>
+                        <input type="text" class="set-q-opts w-full bg-gray-900 border border-gray-600 rounded p-1 text-white text-sm" value="${q.options ? q.options.join(', ') : ''}">
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+        
+        // Expose to window for inline onclick handler
+        window.toggleOptions = function(index, val) {
+            const container = document.getElementById(`opts-container-${index}`);
+            if(val === 'mcq') container.classList.remove('hidden');
+            else container.classList.add('hidden');
+        };
+
+        function saveSettings() {
+            GameState.settings.subject = document.getElementById('set-subject').value;
+            GameState.settings.form = document.getElementById('set-form').value;
+            GameState.settings.teacher = document.getElementById('set-teacher').value;
+            GameState.settings.topics = document.getElementById('set-topics').value;
+            
+            const list = document.getElementById('settings-questions-list');
+            const items = list.children;
+            const newQuestions = [];
+            
+            for(let i=0; i<30; i++) {
+                const item = items[i];
+                const diff = item.querySelector('.set-q-diff').value;
+                const type = item.querySelector('.set-q-type').value;
+                let opts = null;
+                
+                if(type === 'mcq') {
+                    opts = item.querySelector('.set-q-opts').value.split(',').map(s=>s.trim());
+                } else if (type === 'tf') {
+                    opts = ["True", "False"];
+                }
+                
+                newQuestions.push({
+                    id: i+1,
+                    difficulty: diff,
+                    points: diff === 'Easy' ? 10 : (diff === 'Medium' ? 20 : 30),
+                    text: item.querySelector('.set-q-text').value,
+                    type: type,
+                    answer: item.querySelector('.set-q-ans').value,
+                    options: opts
+                });
+            }
+            
+            GameState.questions = newQuestions;
+            document.getElementById('modal-settings').classList.add('hidden');
+            alert('Settings and questions saved! Changes will take effect when a new game starts.');
+        }
+
+        // Start App
+        window.addEventListener('DOMContentLoaded', initApp);
+
+    </script>
+</body>
+</html>
